@@ -152,3 +152,8 @@ Create a virtual optical device on one partition :
 #exec : viosvrcmd -m Server-8203-E4A-SN658EE55 -p lgevio12 -c "mkvdev -fbo -dev lgenim11_cdrom -vadapter vhost0"
 ~~~
 
+# Copyright
+
+The code is licensed as MIT. See the LICENSE file for the full license.
+
+Copyright (c) 2015 Alain Dejoux adejoux@djouxtech.net
