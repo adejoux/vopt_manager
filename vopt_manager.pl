@@ -184,6 +184,7 @@ sub parse_lsmap {
     if ( $line =~ /(vhost\d+):(0x[^:]+):([^:]+):/ ) {
       warn whoami() . " parse NO vopt mapping:" .  $line if $debug;
       my $lparid = sprintf("%d", hex($2));
+      next if $lparid == 0;
       $$refvoptmap{$lparid}{'vhost'} = $1;
       $$refvoptmap{$lparid}{'vios'} = $vios;
     }
