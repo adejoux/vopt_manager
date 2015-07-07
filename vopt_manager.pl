@@ -185,6 +185,7 @@ sub parse_lsmap {
       warn whoami() . " parse NO vopt mapping:" .  $line if $debug;
       my $lparid = sprintf("%d", hex($2));
       next if $lparid == 0;
+      next if defined($$refvoptmap{$lparid}{'vios'});
       $$refvoptmap{$lparid}{'vhost'} = $1;
       $$refvoptmap{$lparid}{'vios'} = $vios;
     }
