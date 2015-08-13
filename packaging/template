@@ -1,0 +1,33 @@
+Package Name: vopt_manager
+Package VRMF: 1.0.0.0
+Update: N
+Fileset
+  Fileset Name: vopt_manager.rte
+  Fileset VRMF: 1.0.0.0
+  Fileset Description: manage creation and deletion of virtual optical devices
+  Bosboot required: N
+  License agreement acceptance required: N
+  Include license files in this package: N
+  Requisites:
+  USRFiles
+     /usr/local/bin/vopt_manager
+     /usr/local/vopt_manager/lib/Net/OpenSSH.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ConnectionCache.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/Constants.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ModuleLoader.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/OSTracer.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/SSH.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/Chain.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSCmd.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSWin.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/POSIX.pm
+     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/csh.pm
+     /usr/local/vopt_manager/lib/Data/Dumper/Simple.pm
+  EOUSRFiles
+  USRLIBLPPFiles
+  EOUSRLIBLPPFiles
+  ROOT Part: N
+  ROOTFiles
+  EOROOTFiles
+EOFileset
