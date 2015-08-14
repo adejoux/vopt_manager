@@ -2,16 +2,13 @@
 # author: Alain Dejoux<adejoux@djouxtech.net>
 # description: manage vopt creation and deletion
 # license : MIT 
-# version : 0.2
+# version : 0.4
 # date : 6 March 2015
 
 use strict;
 use warnings;
-use lib './perl5/lib/site_perl/5.8.8/aix-thread-multi';
-use lib './perl5/lib/perl5';
-use lib './perl5/lib/perl5/ppc-aix';
-use lib './perl5/lib/perl5/lib/site_perl/5.8.8';
 use Getopt::Long ();
+use lib '/usr/local/vopt_manager/lib';
 use Net::OpenSSH;
 use Data::Dumper::Simple;
 
@@ -19,14 +16,15 @@ use Data::Dumper::Simple;
 my $debug  = 0;
 my $hmc_user = "hscroot";
 
-my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $password);
-my (%lpar_list, %voptmap,  %vopt, %lpar_names);
+my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $vios, $password);
+my (%lpar_list, %voptmap,  %vopt, %lpar_names, %vio_names);
 
 Getopt::Long::GetOptions(
     'hmc|h=s' => \$hmc,
     'user|u=s' => \$hmc_user,
     'm=s' => \$managed_system,
     'lpar=s' => \$lpars,
+    'vio=s' => \$vios,
     'pass|p=s' => \$password,
     'unloadopt' => \$unloadopt,
     'list' => \$list,
@@ -55,13 +53,13 @@ sub usage {
   $command =~ s#^.*/##;
 
   print STDERR (
-    "ERROR: " . $message,
-    "usage: $command -m managed system -h hmc [-u user] [-p password] [-lpar lpar1,lpar2] [-list|-unloadopt|-remove|-create] [-exec] \n" .
+    "usage: $command -m managed_system -h hmc [-u user] [-p password] [-lpar lpar1,lpar2] [-list|-unloadopt|-remove|-create] [-exec] \n" .
     "       -h hmc: remote hmc. Hostname or IP address\n" .
-    "       -m managed system: system to manage\n" .
+    "       -m managed_system: system to manage\n" .
     "       -u user: hmc user\n" .
     "       -p password: hmc user password if no ssh key setup\n" .
-    "       -name lpar1,lpar2: list of the partitions where to perform the action\n" .
+    "       -lpar lpar1,lpar2: list of the partitions where to perform the action\n" .
+    "       -vio vio1,vio2: list of the vio servers where to perform the action\n" .
     "       -list: list existing VOPT \n" .
     "       -unloadopt: unload media from existing VOPT \n" .
     "       -remove: remove existing VOPT \n" .
@@ -89,6 +87,8 @@ sub hmc_command {
   my $cmd = shift;
   my $error_msg = shift;
 
+  my $err_out;
+
   warn whoami() . ":" . Dumper($cmd) if $debug;
   my ($stdout, $stderr) = $session->capture2({timeout => 120}, $cmd);
   warn whoami() . ":" . Dumper($stdout) if $debug;
@@ -98,17 +98,23 @@ sub hmc_command {
   }
 
   if ($error_msg) {
-    die "$error_msg\n";
+    $err_out = "$error_msg\n";
   } else {
-    die "$stdout\n$stderr\n";
+    $err_out = "$stdout\n$stderr\n";
   }
+
+  return $stdout,$err_out; 
 }
 
 sub managed_system_validate {
   my ($session, $managed_system) = @_;
-  hmc_command($session,
+  my ($stdout, $errmsg) = hmc_command($session,
               "lssyscfg -r sys -m $managed_system -F name",
               "Managed System $managed_system does not exist. Please enter a valid Managed System name.\n");
+  if ($errmsg) {
+    die $errmsg;
+  }
+  
 }
 
 sub build_lpar_list {
@@ -172,9 +178,11 @@ sub parse_lsmap {
         warn whoami() . " parse vopt mapping:" .  $line if $debug;
         $$refvopt{$vopt}{'vhost'}= $1;
         my $lparid = sprintf("%d", hex($2));
-        $$refvopt{$vopt}{'lparid'}= $lparid;
+        if ($lparid > 0) {
+          $$refvopt{$vopt}{'lparid'}= $lparid;
+          $$refvoptmap{$lparid}{'status'} = "YES";
+        }
         $$refvopt{$vopt}{'physloc'}= $3;
-        $$refvoptmap{$lparid}{'status'} = "YES";
         $status = 1;
       }
     }
@@ -198,7 +206,10 @@ sub check_exec {
   my $cmd = shift;
   if ($exec) {
     print "#exec : " . $cmd . "\n";
-    hmc_command $hmc_session, $cmd;
+     my ($stdout, $errmsg) = hmc_command $hmc_session, $cmd;
+     if ($errmsg) {
+       die $errmsg;
+     }
   } else {
     print "#command to run on hmc : $cmd \n";
   }
@@ -206,12 +217,15 @@ sub check_exec {
 
 sub safe_print {
   my $msg = shift;
+  my $sep = shift;
 
   if (not defined $msg) {
-    print "N/F:";
+    print "N/F";
   } else {
     print $msg;
   }
+  
+  print $sep if defined($sep);
 }
 
 sub check_vopt_lpar {
@@ -220,6 +234,10 @@ sub check_vopt_lpar {
   return 0 unless (%lpar_names);
  
   my $lparid=$vopt{$vopt}{'lparid'};
+
+  if (not defined $lparid) {
+    return 1;
+  }
   my $lpar=$lpar_list{'aixlinux'}{$lparid};
  
   return check_lpar($lpar); 
@@ -238,6 +256,19 @@ sub check_lpar {
   }
 }
 
+sub check_vio {
+  my $vio = shift;
+
+  return 0 unless (%vio_names);
+
+  if ($vio_names{$vio}) {
+    return 0;
+  } else {
+    warn whoami() . ":  vio $vio skipped !\n" if $debug;
+    return 1;
+  }
+}
+
 #
 # Main
 #
@@ -245,10 +276,18 @@ sub check_lpar {
 validate_args();
 
 if ($lpars) {
-  my @entries=split /\n/, $lpars;
+  my @entries=split /,/, $lpars;
   foreach my $entry (@entries) {
     chomp($entry);
     $lpar_names{$entry}=1;
+  }
+}
+
+if ($vios) {
+  my @entries=split /,/, $vios;
+  foreach my $entry (@entries) {
+    chomp($entry);
+    $vio_names{$entry}=1;
   }
 }
 
@@ -265,11 +304,23 @@ warn "main:" . Dumper(@vio_list) if $debug;
 
 foreach my $vios ( @vio_list ) {
    warn  "vio: $vios\n" if $debug;
+   next if check_vio($vios);
 
-   my $result_vopt = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c "lsvopt"#;
+   print "#Getting the virtual optical devices list for vios $vios\n";
+   my ($result_vopt, $errmsg) = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c "lsvopt"#;
+   if ($errmsg) {
+     print "#ERROR running lsvopt on VIOS $vios : $errmsg";
+     next;
+   }
    parse_lsvopt($vios, $result_vopt, \%vopt);
 
-   my $result_map = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c 'lsmap -all -field svsa vtd "Client Partition ID" Physloc -fmt :'#;
+   my $result_map;
+   print "#Getting the vscsi mapping on vios $vios\n";
+   ($result_map, $errmsg) = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c 'lsmap -all -field svsa vtd "Client Partition ID" Physloc -fmt :'#;
+   if ($errmsg) {
+      print "#ERROR running lsmap on VIOS $vios : $errmsg";
+      next;
+   }
    parse_lsmap($vios, $result_map, \%vopt, \%voptmap);
 }
 
@@ -289,11 +340,11 @@ foreach my $vopt (keys %vopt) {
   my $lparid=$vopt{$vopt}{'lparid'};
   next if check_vopt_lpar($vopt);
   print "$vopt:";
-  safe_print "$vopt{$vopt}{'vios'}:";
-  safe_print "$vopt{$vopt}{'vhost'}:";
-  safe_print "$vopt{$vopt}{'physloc'}:";
-  safe_print "$lpar_list{'aixlinux'}{$lparid}:";
-  safe_print "$vopt{$vopt}{'media'}";
+  safe_print $vopt{$vopt}{'vios'}, ":";
+  safe_print $vopt{$vopt}{'vhost'}, ":";
+  safe_print $vopt{$vopt}{'physloc'}, ":";
+  safe_print $lpar_list{'aixlinux'}{$lparid}, ":";
+  safe_print $vopt{$vopt}{'media'};
   print "\n";
 }
 
@@ -330,14 +381,14 @@ if ($create) {
     next if (defined $voptmap{$lparid}{'status'} );
 
     my $lpar = $lpar_list{'aixlinux'}{$lparid};
-
+    
+    next if not defined($lpar);
     next if check_lpar($lpar);
-    my $longdevname = lc($lpar) . "_cdrom"; 
+    my $longdevname = lc($lpar) . "_cd"; 
     my $devname = substr($longdevname, 0, 14);
+
     check_exec qq#viosvrcmd -m $managed_system -p $voptmap{$lparid}{'vios'} -c "mkvdev -fbo -dev $devname -vadapter $voptmap{$lparid}{'vhost'}"#;
   }
 }
-
-  
 
 exit 0;
