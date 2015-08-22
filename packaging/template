@@ -10,20 +10,45 @@ Fileset
   Include license files in this package: N
   Requisites:
   USRFiles
-     /usr/local/bin/vopt_manager
-     /usr/local/vopt_manager/lib/Net/OpenSSH.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ConnectionCache.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/Constants.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ModuleLoader.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/OSTracer.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/SSH.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/Chain.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSCmd.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSWin.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/POSIX.pm
-     /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/csh.pm
-     /usr/local/vopt_manager/lib/Data/Dumper/Simple.pm
+    /usr/local/bin
+    /usr/local/bin/vopt_manager
+    /usr/local/vopt_manager
+    /usr/local/vopt_manager/lib
+    /usr/local/vopt_manager/lib/Data
+    /usr/local/vopt_manager/lib/Data/Dumper
+    /usr/local/vopt_manager/lib/Data/Dumper/Simple.pm
+    /usr/local/vopt_manager/lib/IO
+    /usr/local/vopt_manager/lib/IO/Pty.pm
+    /usr/local/vopt_manager/lib/IO/Tty
+    /usr/local/vopt_manager/lib/IO/Tty.pm
+    /usr/local/vopt_manager/lib/IO/Tty/Constant.pm
+    /usr/local/vopt_manager/lib/Net
+    /usr/local/vopt_manager/lib/Net/OpenSSH
+    /usr/local/vopt_manager/lib/Net/OpenSSH.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ConnectionCache.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/Constants.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ModuleLoader.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/OSTracer.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/SSH.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/Chain.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSCmd.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/MSWin.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/POSIX.pm
+    /usr/local/vopt_manager/lib/Net/OpenSSH/ShellQuoter/csh.pm
+    /usr/local/vopt_manager/lib/Term
+    /usr/local/vopt_manager/lib/Term/Prompt.pm
+    /usr/local/vopt_manager/lib/Term/ReadKey.pm
+    /usr/local/vopt_manager/lib/auto
+    /usr/local/vopt_manager/lib/auto/IO
+    /usr/local/vopt_manager/lib/auto/IO/Tty
+    /usr/local/vopt_manager/lib/auto/IO/Tty/Tty.bs
+    /usr/local/vopt_manager/lib/auto/IO/Tty/Tty.so
+    /usr/local/vopt_manager/lib/auto/Term
+    /usr/local/vopt_manager/lib/auto/Term/ReadKey
+    /usr/local/vopt_manager/lib/auto/Term/ReadKey/ReadKey.bs
+    /usr/local/vopt_manager/lib/auto/Term/ReadKey/ReadKey.so
   EOUSRFiles
   USRLIBLPPFiles
   EOUSRLIBLPPFiles

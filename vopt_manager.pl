@@ -2,7 +2,7 @@
 # author: Alain Dejoux<adejoux@djouxtech.net>
 # description: manage vopt creation and deletion
 # license : MIT 
-# version : 0.4
+# version : 0.5
 # date : 6 March 2015
 
 use strict;
@@ -11,12 +11,13 @@ use Getopt::Long ();
 use lib '/usr/local/vopt_manager/lib';
 use Net::OpenSSH;
 use Data::Dumper::Simple;
+use Term::ReadKey;
 
 # variables
 my $debug  = 0;
 my $hmc_user = "hscroot";
 
-my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $vios, $password);
+my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $vios, $pass, $password);
 my (%lpar_list, %voptmap,  %vopt, %lpar_names, %vio_names);
 
 Getopt::Long::GetOptions(
@@ -25,7 +26,7 @@ Getopt::Long::GetOptions(
     'm=s' => \$managed_system,
     'lpar=s' => \$lpars,
     'vio=s' => \$vios,
-    'pass|p=s' => \$password,
+    'pass' => \$pass,
     'unloadopt' => \$unloadopt,
     'list' => \$list,
     'remove' => \$remove,
@@ -53,11 +54,12 @@ sub usage {
   $command =~ s#^.*/##;
 
   print STDERR (
-    "usage: $command -m managed_system -h hmc [-u user] [-p password] [-lpar lpar1,lpar2] [-list|-unloadopt|-remove|-create] [-exec] \n" .
+    "ERROR: " . $message,
+    "usage: $command -m managed_system -h hmc [-u user] [-p] [-lpar lpar1,lpar2] [-list|-unloadopt|-remove|-create] [-exec] \n" .
     "       -h hmc: remote hmc. Hostname or IP address\n" .
     "       -m managed_system: system to manage\n" .
     "       -u user: hmc user\n" .
-    "       -p password: hmc user password if no ssh key setup\n" .
+    "       -p : prompt for hmc user password\n" .
     "       -lpar lpar1,lpar2: list of the partitions where to perform the action\n" .
     "       -vio vio1,vio2: list of the vio servers where to perform the action\n" .
     "       -list: list existing VOPT \n" .
@@ -274,6 +276,13 @@ sub check_vio {
 #
 
 validate_args();
+
+if ($pass) {
+  printf "Password:\n";
+  ReadMode('noecho');
+  $password =  <STDIN>;
+  ReadMode(0);
+} 
 
 if ($lpars) {
   my @entries=split /,/, $lpars;
