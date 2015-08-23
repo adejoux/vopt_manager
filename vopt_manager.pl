@@ -1,9 +1,9 @@
 #!/usr/bin/perl
 # author: Alain Dejoux<adejoux@djouxtech.net>
 # description: manage vopt creation and deletion
-# license : MIT 
-# version : 0.5
-# date : 6 March 2015
+# license : MIT
+# version : 0.6
+# date : August 22th 2015
 
 use strict;
 use warnings;
@@ -17,7 +17,7 @@ use Term::ReadKey;
 my $debug  = 0;
 my $hmc_user = "hscroot";
 
-my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $vios, $pass, $password);
+my ($list, $unloadopt, $remove, $create, $exec, $managed_system, $hmc, $hmc_session, $lpars, $vio_servers, $pass, $password);
 my (%lpar_list, %voptmap,  %vopt, %lpar_names, %vio_names);
 
 Getopt::Long::GetOptions(
@@ -25,7 +25,7 @@ Getopt::Long::GetOptions(
     'user|u=s' => \$hmc_user,
     'm=s' => \$managed_system,
     'lpar=s' => \$lpars,
-    'vio=s' => \$vios,
+    'vio=s' => \$vio_servers,
     'pass' => \$pass,
     'unloadopt' => \$unloadopt,
     'list' => \$list,
@@ -55,7 +55,7 @@ sub usage {
 
   print STDERR (
     "ERROR: " . $message,
-    "usage: $command -m managed_system -h hmc [-u user] [-p] [-lpar lpar1,lpar2] [-list|-unloadopt|-remove|-create] [-exec] \n" .
+    "usage: $command -m managed_system -h hmc [-u user] [-p] [-vio vio1,vio2] [-lpar lpar1,lpar2] [-list|-unload|-remove|-create] [-exec] \n" .
     "       -h hmc: remote hmc. Hostname or IP address\n" .
     "       -m managed_system: system to manage\n" .
     "       -u user: hmc user\n" .
@@ -63,7 +63,7 @@ sub usage {
     "       -lpar lpar1,lpar2: list of the partitions where to perform the action\n" .
     "       -vio vio1,vio2: list of the vio servers where to perform the action\n" .
     "       -list: list existing VOPT \n" .
-    "       -unloadopt: unload media from existing VOPT \n" .
+    "       -unload: unload media from existing VOPT \n" .
     "       -remove: remove existing VOPT \n" .
     "       -create: create existing VOPT \n" .
     "       -exec: execute the unloadopt, create and remove commands \n\n"
@@ -105,7 +105,7 @@ sub hmc_command {
     $err_out = "$stdout\n$stderr\n";
   }
 
-  return $stdout,$err_out; 
+  return $stdout,$err_out;
 }
 
 sub managed_system_validate {
@@ -116,7 +116,7 @@ sub managed_system_validate {
   if ($errmsg) {
     die $errmsg;
   }
-  
+
 }
 
 sub build_lpar_list {
@@ -156,9 +156,8 @@ sub parse_lsvopt {
       my $media = $2;
       my $size = $3;
 
-      $$refvopt{$vtd}{'media'} = $media;
-      $$refvopt{$vtd}{'size'} = $size;
-      $$refvopt{$vtd}{'vios'} = $vios;
+      $$refvopt{$vios}{$vtd}{'media'} = $media;
+      $$refvopt{$vios}{$vtd}{'size'} = $size;
     }
 
   }
@@ -174,30 +173,26 @@ sub parse_lsmap {
 
   foreach my $line (@lines) {
     my $status = 0;
-
-    foreach my $vopt (keys %{$refvopt} ) {
+    foreach my $vopt (keys %{$$refvopt{$vios}}) {
       if ( $line =~ /(vhost\d+):(0x[^:]+):([^:]+):.*$vopt/ ) {
         warn whoami() . " parse vopt mapping:" .  $line if $debug;
-        $$refvopt{$vopt}{'vhost'}= $1;
+        $$refvopt{$vios}{$vopt}{'vhost'}= $1;
         my $lparid = sprintf("%d", hex($2));
         if ($lparid > 0) {
-          $$refvopt{$vopt}{'lparid'}= $lparid;
-          $$refvoptmap{$lparid}{'status'} = "YES";
+          $$refvopt{$vios}{$vopt}{'lparid'}= $lparid;
+          $$refvoptmap{$lparid}{$vios}{'status'} = "YES";
         }
-        $$refvopt{$vopt}{'physloc'}= $3;
+        $$refvopt{$vios}{$vopt}{'physloc'}= $3;
         $status = 1;
       }
     }
-
     next if ($status);
 
     if ( $line =~ /(vhost\d+):(0x[^:]+):([^:]+):/ ) {
       warn whoami() . " parse NO vopt mapping:" .  $line if $debug;
       my $lparid = sprintf("%d", hex($2));
       next if $lparid == 0;
-      next if defined($$refvoptmap{$lparid}{'vios'});
-      $$refvoptmap{$lparid}{'vhost'} = $1;
-      $$refvoptmap{$lparid}{'vios'} = $vios;
+      $$refvoptmap{$lparid}{$vios}{'vhost'} = $1;
     }
   }
 }
@@ -205,16 +200,25 @@ sub parse_lsmap {
 sub whoami  { ( caller(1) )[3] }
 
 sub check_exec {
-  my $cmd = shift;
+  my ($lpar, $cmd) = @_;
   if ($exec) {
-    print "#exec : " . $cmd . "\n";
-     my ($stdout, $errmsg) = hmc_command $hmc_session, $cmd;
-     if ($errmsg) {
-       die $errmsg;
-     }
-  } else {
-    print "#command to run on hmc : $cmd \n";
+    if (defined $lpar) {
+      print "#hmc command executed for lpar $lpar : " . $cmd . "\n";
+    } else {
+      print "#hmc command executed : " . $cmd . "\n";
+    }
+
+    my ($stdout, $errmsg) = hmc_command $hmc_session, $cmd;
+    if ($errmsg) {
+      die $errmsg;
+    }
+    return
   }
+  if (defined $lpar) {
+    print "#generated command(not run) for lpar $lpar : $cmd \n";
+    return
+  }
+  print "#generated command(not run) : $cmd \n";
 }
 
 sub safe_print {
@@ -226,48 +230,51 @@ sub safe_print {
   } else {
     print $msg;
   }
-  
+
   print $sep if defined($sep);
 }
 
 sub check_vopt_lpar {
-  my $vopt = shift;
- 
-  return 0 unless (%lpar_names);
- 
-  my $lparid=$vopt{$vopt}{'lparid'};
+  my ($vios, $vopt) = @_;
+
+  my $lparid=$vopt{$vios}{$vopt}{'lparid'};
 
   if (not defined $lparid) {
     return 1;
   }
   my $lpar=$lpar_list{'aixlinux'}{$lparid};
- 
-  return check_lpar($lpar); 
+
+  return check_lpar($lpar);
 }
 
 sub check_lpar {
   my $lpar = shift;
 
   return 0 unless (%lpar_names);
+  return 0 if ($lpar_names{$lpar});
 
-  if ($lpar_names{$lpar}) {
-    return 0;
-  } else {
-    warn whoami() . ":  lpar $lpar skipped !\n" if $debug;
-    return 1;
-  }
+  warn whoami() . ":  lpar $lpar skipped !\n" if $debug;
+  return 1;
 }
 
 sub check_vio {
   my $vio = shift;
 
   return 0 unless (%vio_names);
+  return 0 if ($vio_names{$vio});
 
-  if ($vio_names{$vio}) {
-    return 0;
-  } else {
-    warn whoami() . ":  vio $vio skipped !\n" if $debug;
-    return 1;
+  warn whoami() . ":  vio $vio skipped !\n" if $debug;
+  return 1;
+
+}
+
+sub get_lpar {
+  my ($vios, $lparid) = @_;
+
+  my $lpar = $lpar_list{'aixlinux'}{$lparid};
+
+  if (defined $lpar) {
+    return $lpar
   }
 }
 
@@ -282,7 +289,7 @@ if ($pass) {
   ReadMode('noecho');
   $password =  <STDIN>;
   ReadMode(0);
-} 
+}
 
 if ($lpars) {
   my @entries=split /,/, $lpars;
@@ -292,8 +299,8 @@ if ($lpars) {
   }
 }
 
-if ($vios) {
-  my @entries=split /,/, $vios;
+if ($vio_servers) {
+  my @entries=split /,/, $vio_servers;
   foreach my $entry (@entries) {
     chomp($entry);
     $vio_names{$entry}=1;
@@ -315,7 +322,7 @@ foreach my $vios ( @vio_list ) {
    warn  "vio: $vios\n" if $debug;
    next if check_vio($vios);
 
-   print "#Getting the virtual optical devices list for vios $vios\n";
+   print "#Getting the virtual optical devices list for vios $vios\n" if $debug;
    my ($result_vopt, $errmsg) = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c "lsvopt"#;
    if ($errmsg) {
      print "#ERROR running lsvopt on VIOS $vios : $errmsg";
@@ -324,7 +331,7 @@ foreach my $vios ( @vio_list ) {
    parse_lsvopt($vios, $result_vopt, \%vopt);
 
    my $result_map;
-   print "#Getting the vscsi mapping on vios $vios\n";
+   print "#Getting the vscsi mapping on vios $vios\n" if $debug;
    ($result_map, $errmsg) = hmc_command $hmc_session, qq#viosvrcmd -m $managed_system -p $vios -c 'lsmap -all -field svsa vtd "Client Partition ID" Physloc -fmt :'#;
    if ($errmsg) {
       print "#ERROR running lsmap on VIOS $vios : $errmsg";
@@ -340,21 +347,25 @@ print "#Managed System:\t$managed_system\n\n";
 
 print "#\n#LIST VIRTUAL OPTICAL DEVICES\n#\n";
 if (%vopt) {
-  print "#vopt:vios:vhost:physloc:lparid:media\n";
+  print "#vopt:vios:vhost:physloc:lparid:lpar:media\n";
 } else {
   print "# no virtual optical devices\n";
 }
 
-foreach my $vopt (keys %vopt) {
-  my $lparid=$vopt{$vopt}{'lparid'};
-  next if check_vopt_lpar($vopt);
-  print "$vopt:";
-  safe_print $vopt{$vopt}{'vios'}, ":";
-  safe_print $vopt{$vopt}{'vhost'}, ":";
-  safe_print $vopt{$vopt}{'physloc'}, ":";
-  safe_print $lpar_list{'aixlinux'}{$lparid}, ":";
-  safe_print $vopt{$vopt}{'media'};
-  print "\n";
+
+foreach my $vios (sort keys %vopt) {
+  foreach my $vopt (sort keys %{$vopt{$vios}}) {
+    my $lparid=$vopt{$vios}{$vopt}{'lparid'};
+    next if check_vopt_lpar($vios, $vopt);
+    print "$vopt:";
+    safe_print $vios, ":";
+    safe_print $vopt{$vios}{$vopt}{'vhost'}, ":";
+    safe_print $vopt{$vios}{$vopt}{'physloc'}, ":";
+    safe_print $lparid, ":";
+    safe_print $lpar_list{'aixlinux'}{$lparid}, ":";
+    safe_print $vopt{$vios}{$vopt}{'media'};
+    print "\n";
+  }
 }
 
 if ($unloadopt || $remove) {
@@ -362,24 +373,28 @@ if ($unloadopt || $remove) {
   unless (%vopt) {
     print "# no media loaded \n";
   }
-  
-  foreach my $vopt (keys %vopt) {
-    next if ($vopt{$vopt}{'media'} eq "No");
-    next if check_vopt_lpar($vopt);
-    check_exec qq#viosvrcmd -m $managed_system -p $vopt{$vopt}{'vios'} -c "unloadopt -vtd $vopt"#;
+  foreach my $vios (sort keys %vopt) {
+    foreach my $vopt (sort keys %{$vopt{$vios}}) {
+      next if ($vopt{$vios}{$vopt}{'media'} eq "No");
+      next if check_vopt_lpar($vios, $vopt);
+      my $lpar = get_lpar($vios, $vopt{$vios}{$vopt}{'lparid'});
+      check_exec $lpar, qq#viosvrcmd -m $managed_system -p $vios -c "unloadopt -vtd $vopt"#;
+    }
   }
 }
 
 if ($remove) {
   print "#\n#REMOVE VIRTUAL OPTICAL DEVICES\n#\n";
-  if (%vopt) { 
+  unless (%vopt) {
     print "# no virtual optical devices\n";
   }
-
-  foreach my $vopt (keys %vopt) {
-    next if check_vopt_lpar($vopt);
-    next if $vopt{$vopt}{'media'} ne "No";
-    check_exec qq#viosvrcmd -m $managed_system -p $vopt{$vopt}{'vios'} -c "rmvdev -vtd $vopt"#;
+  foreach my $vios (sort keys %vopt) {
+      foreach my $vopt (sort keys %{$vopt{$vios}}) {
+      next if check_vopt_lpar($vios, $vopt);
+      next if $vopt{$vios}{$vopt}{'media'} ne "No";
+      my $lpar = get_lpar($vios, $vopt{$vios}{$vopt}{'lparid'});
+      check_exec $lpar, qq#viosvrcmd -m $managed_system -p $vios -c "rmvdev -vtd $vopt"#;
+    }
   }
 }
 
@@ -387,16 +402,20 @@ if ($create) {
   warn "main:" . Dumper(%voptmap) if $debug;
   print "#\n#CREATE VIRTUAL OPTICAL DEVICES\n#\n";
   foreach my $lparid (keys %voptmap) {
-    next if (defined $voptmap{$lparid}{'status'} );
+    foreach my $vios ( @vio_list ) {
+      warn  "vio: $vios\n" if $debug;
+      next if check_vio($vios);
+      next if (defined $voptmap{$lparid}{$vios}{'status'} );
 
-    my $lpar = $lpar_list{'aixlinux'}{$lparid};
-    
-    next if not defined($lpar);
-    next if check_lpar($lpar);
-    my $longdevname = lc($lpar) . "_cd"; 
-    my $devname = substr($longdevname, 0, 14);
+      my $lpar = $lpar_list{'aixlinux'}{$lparid};
 
-    check_exec qq#viosvrcmd -m $managed_system -p $voptmap{$lparid}{'vios'} -c "mkvdev -fbo -dev $devname -vadapter $voptmap{$lparid}{'vhost'}"#;
+      next if not defined($lpar);
+      next if check_lpar($lpar);
+      my $longdevname = lc($lpar) . "_cd";
+      my $devname = substr($longdevname, 0, 14);
+
+      check_exec $lpar, qq#viosvrcmd -m $managed_system -p $vios -c "mkvdev -fbo -dev $devname -vadapter $voptmap{$lparid}{$vios}{'vhost'}"#;
+    }
   }
 }
 

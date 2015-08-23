@@ -4,7 +4,7 @@ Update: N
 Fileset
   Fileset Name: vopt_manager.rte
   Fileset VRMF: 1.0.0.0
-  Fileset Description: manage creation and deletion of virtual optical devices
+  Fileset Description: virtual optical devices manager
   Bosboot required: N
   License agreement acceptance required: N
   Include license files in this package: N
